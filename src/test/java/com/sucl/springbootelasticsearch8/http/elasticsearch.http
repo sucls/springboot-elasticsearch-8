@@ -1,0 +1,570 @@
+### elasticsearch
+GET http://{{url}}
+Content-Type: application/json
+Authorization: {{authc}}
+
+### 创建索引
+PUT localhost:9200/index_novel
+Content-Type: application/json
+Authorization: {{authc}}
+
+{
+  "settings": {
+    "index": {
+      "number_of_shards": 1,
+      "number_of_replicas": 1
+    }
+  },
+  "mappings": {
+    "properties": {
+      "title": {
+        "type": "text",
+        "fields": {
+          "keyword": { "ignore_above": 256, "type": "keyword" }
+        }
+      },
+      "author": { "type": "keyword" },
+      "category": { "type": "keyword"  },
+      "type": { "type": "keyword"  },
+      "description": { "analyzer": "ik_max_word", "type": "text" },
+      "content": { "analyzer": "ik_max_word", "type": "text" },
+      "coverUrl": { "type": "text" },
+      "insertTime": { "format": "date_time", "type": "date" },
+      "updateTime": { "format": "date_time", "type": "date" },
+      "status": { "type": "keyword" }
+    }
+  }
+}
+
+### 查询索引信息
+GET http://localhost:9200/index_novel
+Content-Type: application/json
+Authorization: {{authc}}
+
+### 删除索引
+DELETE http://localhost:9200/index_novel
+Authorization: {{authc}}
+
+
+################################################################### 文档操作 #############################################################################
+
+### 新增文档数据
+#### POST http://localhost:9200/<index>/_doc/<id> id可忽略
+POST http://localhost:9200/index_novel/_doc/1
+Content-Type: application/json
+Authorization: {{authc}}
+
+{
+  "title": "遮天",
+  "author": "辰东"
+}
+
+### 修改文档数据（更新整个文档）
+POST http://localhost:9200/index_novel/_doc/1
+Content-Type: application/json
+Authorization: {{authc}}
+
+{
+  "title": "遮天",
+  "author": "辰A"
+}
+
+### 修改文档数据（部分字段）
+POST http://localhost:9200/index_novel/_update/1
+Content-Type: application/json
+Authorization: {{authc}}
+
+{
+  "doc": {
+    "author": "辰AA"
+  }
+}
+
+### 根据脚本修改数据（painless）
+POST http://localhost:9200/index_novel/_update/1
+Content-Type: application/json
+Authorization: {{authc}}
+
+{
+  "script": {
+    "lang": "painless",
+    "inline": "ctx._source.author += 'C'"
+  }
+}
+
+### 批量操作 - 需要使用postman执行
+#### create 如果文档不存在就创建，但如果文档存在就返回错误
+#### index  如果文档不存在就创建，如果文档存在就更新
+#### update 更新一个文档，如果文档不存在就返回错误
+#### delete 删除一个文档，如果要删除的文档id不存在，就返回错误。 后面可以连接 doc 、 upsert 、 script
+POST http://localhost:9200/_bulk
+Content-Type: application/x-ndjson
+Authorization: {{authc}}
+
+{"create": {"_index": "index_novel", "_id": "4"}}
+{"title": "其他1", "description": "xxx"}
+{"index": {"_index": "index_novel", "_id": "5"}}
+{"title": "其他2", "description": "xxx11"}
+{"update": {"_index": "index_novel","_id": "1"}}
+{"doc": {"author": "辰"}}
+
+
+### 简单查询 根据主键查询
+GET localhost:9200/index_novel/_doc/1
+Authorization: {{authc}}
+
+### 根据主键删除
+DELETE localhost:9200/index_novel/_doc/1
+Authorization: {{authc}}
+
+### URL参数查询
+GET http://localhost:9200/index_novel/_search?q=*天&pretty
+Authorization: {{authc}}
+
+### 查询所有（但可控制显示）
+### GET index_novel/_search?q=*&sort=title:asc
+POST http://localhost:9200/index_novel/_search
+Content-Type: application/json
+Authorization: {{authc}}
+
+{
+  "query": {
+    "match_all": {}
+  },
+  "from": 0,
+  "size": 5,
+  "_source": [ "title" ]
+}
+
+### 查询
+POST localhost: 9200/index_novel/_search
+Content-Type: application/json
+Authorization: {{authc}}
+
+{
+  "_source": ["title","author","type","category","description","status","updateTime"],
+  "query": {
+    "match": {
+      "description": "天下"
+    }
+  },
+  "highlight": {
+    "pre_tags": [
+      "<span color='red'>"
+    ],
+    "post_tags": [
+      "</span>"
+    ],
+    "fields": {
+      "description": {
+        "fragment_size": 100,
+        "number_of_fragments": 5
+      }
+    }
+  },
+  "sort": [
+    {
+      "title.keyword": {
+        "order": "desc"
+      }
+    },
+    {"insertTime": { "order": "desc" }},
+    {"insertTime": { "mode": "max"}}
+  ],
+  "from": 1,
+  "size": 5
+}
+
+### 删除文档数据
+DELETE localhost:9200/index_novel/_doc/1
+Authorization: {{authc}}
+
+### DSL QUERY
+#### 分词匹配（条件拆分）  {match: {<field>:<value>}} 或者 {match:{<field>: { query: <value>,... }}  }  是不是有一个匹配成功即可？
+#### 习语匹配（完全匹配）  {match_phrase: {<field>:<value>}}  将参数分词进行匹配，但需要满足匹配度
+#### 多条件匹配           {multi_match: { query: <value> , fields: [ <field> ...]}} 先对参数进行分词，然后对多字段匹配
+#### 条件匹配             {query_string: <value>}
+#### 字段匹配             {term: {<field>: <value>} }
+#### 范围匹配             {range: { <field>: { <option>: <value> ... } }}
+#### exists查询           {exists: { field: <field>}}
+GET {{url}}
+
+### Match-simple
+POST localhost:9200/index_novel/_search
+Content-Type: application/json
+Authorization: {{authc}}
+
+{
+  "_source": ["title","author","type","category","description","status","updateTime"],
+  "query": {
+    "match": {
+      "title": "天下"
+    }
+  }
+}
+
+### Match-options
+POST localhost:9200/index_novel/_search
+Content-Type: application/json
+Authorization: {{authc}}
+
+{
+  "_source": ["title","author","type","category","description","status","updateTime"],
+  "query": {
+    "match": {
+      "title": {
+        "query": "天下",
+        "minimum_should_match": "30%"
+      }
+    }
+  }
+}
+
+### MATCH_PHRASE-simple
+POST localhost:9200/index_novel/_search
+Content-Type: application/json
+Authorization: {{authc}}
+
+{
+  "_source": ["title","author","type","category","description","status","updateTime"],
+  "query": {
+    "match_phrase": {
+      "title": "天下"
+    }
+  }
+}
+
+### MATCH_PHRASE-option
+POST localhost:9200/index_novel/_search
+Content-Type: application/json
+Authorization: {{authc}}
+
+{
+  "_source": ["title","author","type","category","description","status","updateTime"],
+  "query": {
+    "match_phrase": {
+      "title" : {"query": "天下", "slop": "1"}
+    }
+  }
+}
+
+### MULTI_MATCH
+POST localhost:9200/index_novel/_search
+Content-Type: application/json
+Authorization: {{authc}}
+
+{
+  "_source": ["title","author","type","category","description","status","updateTime"],
+  "query": {
+    "multi_match": {
+      "query": "天下",
+      "fields": [ "title", "author", "description" ]
+    }
+  }
+}
+
+### QUERY_STRING
+POST localhost:9200/index_novel/_search
+Content-Type: application/json
+Authorization: {{authc}}
+
+{
+  "_source": ["title","author","type","category","description","status","updateTime"],
+  "query": {
+    "query_string": {
+      "query": "title: 天下 OR author: 天"
+    }
+  }
+}
+
+### TERM - 完全匹配
+POST localhost:9200/index_novel/_search
+Content-Type: application/json
+Authorization: {{authc}}
+
+{
+  "_source": ["title","author","type","category","description","status","updateTime"],
+  "query": {
+    "term": { "author": "泪冠哀歌" }
+  }
+}
+
+### TERMS
+POST localhost:9200/index_novel/_search
+Content-Type: application/json
+Authorization: {{authc}}
+
+{
+  "_source": ["title","author","type","category","description","status","updateTime"],
+  "query": {
+    "terms": {
+      "title": ["天下","完美"]
+    }
+  }
+}
+
+
+### RANGE
+#### "insertTime": { "gte": "2023-06-01T00:00:00Z", "lte": "2023-06-30T00:00:00Z" }
+POST localhost:9200/index_novel/_search
+Content-Type: application/json
+Authorization: {{authc}}
+
+{
+  "_source": ["title","author","type","category","description","status","updateTime"],
+  "query": {
+    "range": {
+      "insertTime": { "gte": 1685577600000, "lte": 1686452995282 }
+    }
+  }
+}
+
+### 复合查询
+#### bool
+#### constant_score
+#### function_score
+#### dis_max
+GET localhost:9200/index_novel
+
+
+### CONSTANT_SCORE
+#### filter	必须,查询对象,指定希望执行的过滤查询,任何返回的文档都必须匹配这个查询;过滤查询不会计算相似度分,为提升性能,ES会对使用频率高的过滤查询的结果进行缓存
+#### boost	可选,浮点数,该值作为匹配了以上filter的文档的相似度分,默认为1.0
+POST localhost:9200/index_novel/_search
+Content-Type: application/json
+Authorization: {{authc}}
+
+{
+  "_source": ["title","author","type","category","description","status","updateTime"],
+  "query": {
+    "constant_score": {
+      "filter": {
+        "term": {
+          "description": "天下"
+        }
+      },
+      "boost": 1
+    }
+  }
+}
+
+### DIS_MAX 相似度分查询
+#### queries	必须,数组对象,包含一个或多个查询子句,返回的文档必须匹配一个或多个查询条件,匹配的条件越多则分数越高
+#### tie_breaker	可选,浮点值,参数介于0与1.0之间,用于增加匹配条件文档额外的分,默认为0.0
+POST localhost:9200/index_novel/_search
+Content-Type: application/json
+Authorization: {{authc}}
+
+{
+  "_source": ["title","author","type","category","description","status","updateTime"],
+  "query": {
+    "dis_max": {
+      "tie_breaker": 0.7,
+      "queries": [
+        {
+          "term": {
+            "description": "天下"
+          }
+        }
+      ]
+    }
+  }
+}
+
+### FUNCTION_SCORE
+#### score_mode
+#####   multiply	计算分数相乘(默认模式)
+#####   sum	计算分数求和
+#####   ave	计算分数求平均
+#####   first	文档在函数中首个匹配的过滤器计算的分数
+#####   max	计算分数最大作为分数
+#####   min	计算分数最小最为分数
+#### boost_mode
+#####   multiply	查询分与函数分相乘(默认模式)
+#####	replace	使用函数分,查询分忽略
+#####	sum	查询分与函数分相加
+#####	avg	查询分与函数分的平均分
+#####	max	查询分与函数分中最大值
+#####	min	查询分与函数分中最小值
+#### 记分函数
+#####   script_score
+#####	weight
+#####	random_score
+#####	field_value_factor
+#####	历史遗留函数(gauss、linear、exp)
+POST localhost:9200/index_novel/_search
+Content-Type: application/json
+Authorization: {{authc}}
+
+{
+  "_source": ["title","author","type","category","description","status","updateTime"],
+  "query": {
+    "function_score": {
+      "query": {"match": {"description": "天下"}},
+      "boost": 5,
+      "random_score": {},
+      "boost_mode": "multiply"
+    }
+  }
+}
+
+### BOOL
+#### must 查询必须匹配某些条件才可以返回
+#### must_not查询必须不匹配某些条件
+#### should 当查询满足此条件时,会增加其_score值
+#### filter 必须匹配,但是结果不会计算分值，缓存
+POST localhost:9200/index_novel/_search
+Content-Type: application/json
+Authorization: {{authc}}
+
+{
+    "query":{
+        "bool":{
+            "filter":{
+                "term":{ "title":"遮天" }
+            },
+            "should":[
+                {
+                    "match": { "title":"遮天" }
+                }
+            ],
+            "must":[
+                {
+                    "match":{ "title":"遮天" }
+                }
+            ]
+        }
+    }
+}
+
+### 连接查询 ...
+GET localhost:9200/index_novel
+
+### 聚合查询
+#### 针对属性做运算查询 terms,stats,max...
+### 根据关键字对字段检索，并按照字段分组排序
+POST localhost: 9200/index_novel/_search
+Content-Type: application/json
+Authorization: {{authc}}
+
+{
+  "_source": ["title","author","type","category","description","status","updateTime"],
+  "from": 0,
+  "size": 5,
+  "query": {
+    "multi_match": {
+      "query": "天下",
+      "fields": [ "title", "description", "content" ]
+    }
+  },
+  "aggs": {
+    "agg_by_type": {
+      "terms": {
+        "field": "type",
+        "order": {
+          "_count": "asc"
+        }
+      }
+    },
+    "agg_by_author": {
+      "cardinality": {
+        "field": "author"
+      }
+    }
+  }
+}
+
+### 分页 from-size
+POST localhost: 9200/index_novel/_search
+Content-Type: application/json
+Authorization: {{authc}}
+
+{
+  "_source": ["title","author","type","category","description","status","updateTime"],
+  "from": 0,
+  "size":10
+}
+
+### 分页 search_after（获取PID）
+POST localhost: 9200/index_novel/_pit?keep_alive=5m
+Content-Type: application/json
+Authorization: {{authc}}
+
+### 分页 search_after（构建分页查询）
+#### 获取上一步的pit.id
+POST localhost: 9200/_search
+Content-Type: application/json
+Authorization: {{authc}}
+
+{
+  "size":5,
+  "_source": ["title","author","type","category","description","status","updateTime"],
+  "query": {
+    "match_all" : {}
+  },
+  "pit": {
+    "id":  "p_rrAwELaW5kZXhfbm92ZWwWVVRWQ0Mzd01Sd2V1X2VTNkpSUnVtUQAWdUFLckJyMExUUXE1dWI0VWtKeHVDUQAAAAAAAAAAOBZUWGRWZGFNNlNxeVpGUXdJVy0wQXVBAAEWVVRWQ0Mzd01Sd2V1X2VTNkpSUnVtUQAA",
+    "keep_alive": "1m"
+  },
+  "sort": {
+    "title.keyword": "asc"
+  }
+}
+
+###分页 search_after（执行分页查询）
+### search_after 为上一步最后的 sort
+POST localhost: 9200/_search
+Content-Type: application/json
+Authorization: {{authc}}
+
+{
+  "size":5,
+  "_source": ["title","author","type","category","description","status","updateTime"],
+  "query": {
+    "match_all" : {}
+  },
+  "pit": {
+    "id":  "p_rrAwELaW5kZXhfbm92ZWwWVVRWQ0Mzd01Sd2V1X2VTNkpSUnVtUQAWdUFLckJyMExUUXE1dWI0VWtKeHVDUQAAAAAAAAAAOBZUWGRWZGFNNlNxeVpGUXdJVy0wQXVBAAEWVVRWQ0Mzd01Sd2V1X2VTNkpSUnVtUQAA",
+    "keep_alive": "1m"
+  },
+  "sort": {
+    "title.keyword": "asc"
+  },
+  "search_after": [
+    "仙武长生：我将低武练成了仙武",
+    13
+  ]
+}
+
+###分页 scroll（获取_scroll_id）
+POST localhost: 9200/index_novel/_search?scroll=5m
+Content-Type: application/json
+Authorization: {{authc}}
+
+{
+  "size":5,
+  "_source": ["title","author","type","category","description","status","updateTime"],
+  "query": {
+    "match_all" : {}
+  },
+  "sort": {
+    "title.keyword": "asc"
+  }
+}
+
+### 分页 scroll（执行查询）
+POST localhost: 9200/_search/scroll
+Content-Type: application/json
+Authorization: {{authc}}
+
+{
+  "scroll": "5m",
+  "scroll_id": "FGluY2x1ZGVfY29udGV4dF91dWlkDXF1ZXJ5QW5kRmV0Y2gBFlRYZFZkYU02U3F5WkZRd0lXLTBBdUEAAAAAAAAAPhZ1QUtyQnIwTFRRcTV1YjRVa0p4dUNR"
+}
+
+### 查看分词结果
+POST http://localhost:9200/_analyze/?pretty
+Content-Type: application/json
+Authorization: {{authc}}
+
+{ "analyzer": "ik_max_word", "text": "测试用例" }
