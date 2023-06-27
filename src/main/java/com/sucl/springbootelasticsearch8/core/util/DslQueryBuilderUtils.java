@@ -10,6 +10,7 @@ import com.sucl.springbootelasticsearch8.core.query.Order;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -20,7 +21,7 @@ import java.util.stream.Collectors;
 @Slf4j
 public class DslQueryBuilderUtils {
 
-    public static Query.Builder newQueryBuilder(){
+    private static Query.Builder newQueryBuilder(){
         return new Query.Builder(){
             @Override
             public Query build() {
@@ -41,15 +42,20 @@ public class DslQueryBuilderUtils {
         Query.Builder builder = newQueryBuilder();
         switch (dslQuery.getType()){
             case MATCH_ALL -> {
-                builder.matchAll(QueryBuilders.matchAll().build());
+                builder.matchAll(fn->fn);
                 break;
             }
             case MATCH -> {
-                builder.match(QueryBuilders.match().query(dslQuery.getStrValue()).field(dslQuery.getField()).build());
+                builder.match(fn->{
+                    fn.query(dslQuery.getStrValue()).field(dslQuery.getField());
+                    dslQuery.option("analyzer", String.class, fn::analyzer)
+                            .option("fuzziness", String.class, fn::fuzziness);
+                    return fn;
+                });
                 break;
             }
             case MULTI_MATCH -> {
-                builder.multiMatch(QueryBuilders.multiMatch().fields(dslQuery.getFields()).query(dslQuery.getStrValue()).build());
+                builder.multiMatch(fn->fn.fields(dslQuery.getFields()).query(dslQuery.getStrValue()));
                 break;
             }
             case PREFIX -> {
@@ -116,8 +122,8 @@ public class DslQueryBuilderUtils {
         }
         switch ( compoundQuery.getType() ){
             case BOOL_QUERY -> {
-                queryBuilder.bool(er->{
-                    return er;
+                queryBuilder.bool(builder->{
+                    return builder;
                 });
             }
             case DIS_MAX -> {

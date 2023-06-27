@@ -14,7 +14,7 @@ import java.util.Objects;
  * @since 1.0.0
  */
 @Data
-public class DslQuery implements Query{
+public class DslQuery extends QuerySupport{
 
     private String field;
 

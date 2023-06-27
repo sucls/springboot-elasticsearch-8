@@ -23,11 +23,23 @@ import java.util.Arrays;
 @Slf4j
 public class QueryBuilderTest {
 
+    @Test
+    public void printMatchAllJson(){
+        Query query = DslQueryBuilderUtils.buildQueryBuilder(DslQuery.of(DslQuery.Type.MATCH_ALL, null, null)).build();
+        log.info("match all:{}", query);
+    }
+
     /**
      *
      */
     @Test
-    public void printQueryJson(){
+    public void printMatchJson(){
+        Query query = DslQueryBuilderUtils.buildQueryBuilder(DslQuery.of(DslQuery.Type.MATCH, "title", "天下")).build();
+        log.info("match:{}", query);
+    }
+
+    @Test
+    public void printPageQueryJson(){
         Pageable pageRequest = PageRequest.of(1, 30);
         DslQuery dslQuery = new DslQuery();
         dslQuery.setType(DslQuery.Type.MATCH);
