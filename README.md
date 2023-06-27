@@ -523,22 +523,19 @@ public class NovelService {
 1. 从起点小说网按类型加载小说到es
 2. 基于spring-boot-starter-data-elasticsearch实现小说句的检索
 
-起点小说数据加载到elasticsearch，主要实现方式是通过工具jsoup解析小说网站的，并按文档结构组装文档数据，并调用es API将数据存储到es中，大概有一下几个过程
++ 起点小说数据加载到elasticsearch，主要实现方式是通过工具jsoup解析小说网站的，并按文档结构组装文档数据，并调用es API将数据存储到es中，大概有一下几个过程
 1. 访问起点小说网https://www.qidian.com/free/all/，根据传入的分类与页码参数按页获取页面html
 2. 解析上一步html，分别获取每个小说目录html片段，解析成一部小说文档数据
 3. 按目录分别加载每个章节页面html，按章节分别加载章节小说内容，最后将所有内容拼接到小说文档数据中
 4. 调用API将小说数据存储到elasticsearch
+5. 篇幅有限，具体实现可以参考下面的github
 
-```java
-
-```
-
-小说查询相关DAO可以参考上面的集成
++ 小说查询相关DAO可以参考上面的集成
 ```
 略
 ```
 
-添加service与controller
++ 添加service与controller
 ```java
 @Service
 public class NovelService {
@@ -588,7 +585,7 @@ public class NovelService {
 
 示例内容涉及到Elasticsearch DSL QUERY组装过程以及上面说到的SimpleElasticsearchRepository不足以支撑业务查询时的一些扩展方法。
 示例使用了起点小说网站加载小说数据，其他网站实现思路一样。由于篇幅原因，具体代码实现可以参考：
-> []()
+> [springboot-elasticsearch-8](https://github.com/sucls/springboot-elasticsearch-8)
 
 ### 结束语
 
